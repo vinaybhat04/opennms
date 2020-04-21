@@ -180,7 +180,7 @@ public class ElasticFlowRepository implements FlowRepository {
                                  DocumentEnricher documentEnricher, ClassificationEngine classificationEngine,
                                  SessionUtils sessionUtils, NodeDao nodeDao, SnmpInterfaceDao snmpInterfaceDao,
                                  Identity identity, TracerRegistry tracerRegistry, EnrichedFlowForwarder enrichedFlowForwarder,
-                                 IndexSettings indexSettings, int bulkRetryCount, long maxFlowDurationMs) {
+                                 IndexSettings indexSettings, int bulkRetryCount, long maxFlowDurationMs, long timeRangeAggregateThresholdMs) {
         this.client = Objects.requireNonNull(jestClient);
         this.indexStrategy = Objects.requireNonNull(indexStrategy);
         this.documentEnricher = Objects.requireNonNull(documentEnricher);
@@ -189,11 +189,11 @@ public class ElasticFlowRepository implements FlowRepository {
         this.nodeDao = Objects.requireNonNull(nodeDao);
         this.snmpInterfaceDao = Objects.requireNonNull(snmpInterfaceDao);
         this.bulkRetryCount = bulkRetryCount;
-        this.indexSelector = new IndexSelector(indexSettings, INDEX_NAME, indexStrategy, maxFlowDurationMs);
         this.identity = identity;
         this.tracerRegistry = tracerRegistry;
         this.enrichedFlowForwarder = enrichedFlowForwarder;
         this.indexSettings = Objects.requireNonNull(indexSettings);
+        this.indexSelector = new IndexSelector(indexSettings, INDEX_NAME, indexStrategy, maxFlowDurationMs, timeRangeAggregateThresholdMs);
 
         flowsPersistedMeter = metricRegistry.meter("flowsPersisted");
         logEnrichementTimer = metricRegistry.timer("logEnrichment");

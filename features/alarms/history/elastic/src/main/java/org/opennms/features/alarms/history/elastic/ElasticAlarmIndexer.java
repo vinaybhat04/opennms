@@ -172,7 +172,7 @@ public class ElasticAlarmIndexer implements AlarmLifecycleListener, Runnable {
         alarmsToESMetrics = new ElasticAlarmMetrics(metrics, taskQueue);
         this.indexStrategy = Objects.requireNonNull(indexStrategy);
         this.indexSettings = Objects.requireNonNull(indexSettings);
-        this.indexSelector = new IndexSelector(indexSettings, INDEX_NAME, indexStrategy, 0);
+        this.indexSelector = new IndexSelector(indexSettings, INDEX_NAME, indexStrategy, 0, 0);
     }
 
     public void init() {

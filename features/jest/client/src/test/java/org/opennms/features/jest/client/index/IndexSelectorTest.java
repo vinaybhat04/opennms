@@ -318,7 +318,7 @@ public class IndexSelectorTest {
             List<String> expectedList = Arrays.asList(expected);
             long expandTimeRangeInMs = 2 * 60 * 1000; // 2 min
             assertEquals(String.format("Test failed for strategy %s from %s to %s", this.strategy.name(), this.from, this.to)
-                         , expectedList, new IndexSelector(new IndexSettings(), "prefix", strategy, expandTimeRangeInMs).getIndexNames(start.getTime(), end.getTime()));
+                         , expectedList, new IndexSelector(new IndexSettings(), "prefix", strategy, expandTimeRangeInMs, 0).getIndexNames(start.getTime(), end.getTime()));
         }
     }
 }

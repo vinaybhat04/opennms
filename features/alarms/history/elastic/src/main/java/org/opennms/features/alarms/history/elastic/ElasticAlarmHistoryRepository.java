@@ -71,7 +71,7 @@ public class ElasticAlarmHistoryRepository implements AlarmHistoryRepository {
     public ElasticAlarmHistoryRepository(JestClient client, IndexStrategy indexStrategy, IndexSettings indexSettings) {
         this.client = Objects.requireNonNull(client);
         Objects.requireNonNull(indexStrategy);
-        this.indexSelector = new IndexSelector(indexSettings, ElasticAlarmIndexer.INDEX_NAME, indexStrategy, 0);
+        this.indexSelector = new IndexSelector(indexSettings, ElasticAlarmIndexer.INDEX_NAME, indexStrategy, 0, 0);
     }
 
     @Override

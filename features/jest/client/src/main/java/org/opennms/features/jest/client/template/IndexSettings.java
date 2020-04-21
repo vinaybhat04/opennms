@@ -42,6 +42,8 @@ public class IndexSettings {
 
     private String refreshInterval;
 
+    private String aggregateIndexPrefix;
+
     public String getIndexPrefix() {
         return indexPrefix;
     }
@@ -99,6 +101,14 @@ public class IndexSettings {
         if (!Strings.isNullOrEmpty(numberOfReplicas)) {
             setNumberOfReplicas(Integer.valueOf(numberOfReplicas));
         }
+    }
+
+    public String getAggregateIndexPrefix() {
+        return aggregateIndexPrefix;
+    }
+
+    public void setAggregateIndexPrefix(String aggregateIndexPrefix) {
+        this.aggregateIndexPrefix = aggregateIndexPrefix;
     }
 
     public boolean isEmpty() {

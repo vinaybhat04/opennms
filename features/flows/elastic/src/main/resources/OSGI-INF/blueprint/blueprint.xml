@@ -46,6 +46,8 @@
             <cm:property name="settings.index.refresh_interval" value="" />
             <cm:property name="settings.index.routing_partition_size" value="" />
             <cm:property name="indexPrefix" value="" />
+            <cm:property name="aggregateIndexPrefix" value="aggregated-flows"/>
+            <cm:property name="timeRangeAggregateThresholdMs" value="0"/>
         </cm:default-properties>
     </cm:property-placeholder>
 
@@ -98,6 +100,7 @@
         <property name="numberOfReplicas" value="${settings.index.number_of_replicas}"/>
         <property name="refreshInterval" value="${settings.index.refresh_interval}"/>
         <property name="routingPartitionSize" value="${settings.index.routing_partition_size}"/>
+        <property name="aggregateIndexPrefix" value="${aggregateIndexPrefix}"/>
     </bean>
 
     <!-- Enrichment -->
@@ -152,6 +155,7 @@
         <argument ref="indexSettings"/>
         <argument value="${bulkRetryCount}" />
         <argument value="${maxFlowDurationMs}" />
+        <argument value="${timeRangeAggregateThresholdMs}"/>
         <property name="enableFlowForwarding" value="${enableForwarding}"/>
     </bean>
     <!-- Proxy it, to ensure initialization on first call of any method -->

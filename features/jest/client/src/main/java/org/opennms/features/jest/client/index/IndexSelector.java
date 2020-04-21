@@ -68,8 +68,10 @@ public class IndexSelector {
     private final IndexStrategy strategy;
     private final TemporalUnit unit;
     private final long expandTimeRangeInMs;
+    private final long timeRangeAggregateThresholdMs;
 
-    public IndexSelector(IndexSettings indexSettings, String prefix, IndexStrategy strategy, long expandTimeRangeInMs) {
+    public IndexSelector(IndexSettings indexSettings, String prefix, IndexStrategy strategy,
+                         long expandTimeRangeInMs, long timeRangeAggregateThresholdMs) {
         this.indexSettings = Objects.requireNonNull(indexSettings);
         this.prefix = prefix;
         this.strategy = strategy;
@@ -80,6 +82,7 @@ public class IndexSelector {
                     + strategy.name());
         }
         this.expandTimeRangeInMs = expandTimeRangeInMs;
+        this.timeRangeAggregateThresholdMs = timeRangeAggregateThresholdMs;
     }
 
     /**
@@ -97,7 +100,10 @@ public class IndexSelector {
         Instant endDate = adjustEndTime(new Date(end + expandTimeRangeInMs));
         Instant startDate = Instant.ofEpochMilli(start - expandTimeRangeInMs);
         Instant currentDate = startDate;
-
+        long duration = end - start;
+        if (duration > 0 && timeRangeAggregateThresholdMs > duration) {
+            indexSettings.setIndexPrefix(indexSettings.getAggregateIndexPrefix());
+        }
         while (currentDate.isBefore(endDate)) {
             String index = strategy.getIndex(indexSettings, prefix, currentDate);
             all.add(index);
