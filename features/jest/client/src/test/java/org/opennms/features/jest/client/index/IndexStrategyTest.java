@@ -62,7 +62,7 @@ public class IndexStrategyTest {
         // Verify each strategy
         final IndexStrategy[] strategies = IndexStrategy.values();
         for (int i=0; i<expectedValues.length; i++) {
-            final String actualValue = strategies[i].getIndex(indexSettings,"opennms", cal.toInstant());
+            final String actualValue = strategies[i].getIndex(indexSettings.getIndexPrefix(),"opennms", cal.toInstant());
             final String expectedValue = "opennms-" + expectedValues[i];
             assertEquals(expectedValue, actualValue);
         }
@@ -77,7 +77,7 @@ public class IndexStrategyTest {
         // Set date to "Wednesday, March 28, 2018 2:55:05 AM UTC"
         // This is "Tuesday March 27, 2018 21:55:05 EST"
         final Instant instant = Instant.ofEpochMilli(1522205705000L);
-        assertEquals("opennms-2018-03-28", IndexStrategy.DAILY.getIndex(indexSettings,"opennms", instant));
-        assertEquals("opennms-2018-03-28-02", IndexStrategy.HOURLY.getIndex(indexSettings,"opennms", instant));
+        assertEquals("opennms-2018-03-28", IndexStrategy.DAILY.getIndex(indexSettings.getIndexPrefix(),"opennms", instant));
+        assertEquals("opennms-2018-03-28-02", IndexStrategy.HOURLY.getIndex(indexSettings.getIndexPrefix(),"opennms", instant));
     }
 }

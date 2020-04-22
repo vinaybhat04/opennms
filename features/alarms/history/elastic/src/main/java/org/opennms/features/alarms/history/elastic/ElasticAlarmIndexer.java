@@ -324,7 +324,7 @@ public class ElasticAlarmIndexer implements AlarmLifecycleListener, Runnable {
         final BulkRequest<AlarmDocumentDTO> bulkRequest = new BulkRequest<>(client, alarmDocuments, (documents) -> {
             final Bulk.Builder bulkBuilder = new Bulk.Builder();
             for (AlarmDocumentDTO alarmDocument : alarmDocuments) {
-                final String index = indexStrategy.getIndex(indexSettings, INDEX_NAME, Instant.ofEpochMilli(alarmDocument.getUpdateTime()));
+                final String index = indexStrategy.getIndex(indexSettings.getIndexPrefix(), INDEX_NAME, Instant.ofEpochMilli(alarmDocument.getUpdateTime()));
                 final Index.Builder indexBuilder = new Index.Builder(alarmDocument)
                         .index(index);
                 if (LOG.isTraceEnabled()) {

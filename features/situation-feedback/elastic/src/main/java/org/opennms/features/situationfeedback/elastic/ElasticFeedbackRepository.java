@@ -102,7 +102,7 @@ public class ElasticFeedbackRepository implements FeedbackRepository {
         BulkRequest<FeedbackDocument> bulkRequest = new BulkRequest<>(client, feedbackDocuments, (documents) -> {
             final Bulk.Builder bulkBuilder = new Bulk.Builder();
             for (FeedbackDocument document : documents) {
-                final String index = indexStrategy.getIndex(indexSettings, INDEX_NAME, Instant.ofEpochMilli(document.getTimestamp()));
+                final String index = indexStrategy.getIndex(indexSettings.getIndexPrefix(), INDEX_NAME, Instant.ofEpochMilli(document.getTimestamp()));
                 final Index.Builder indexBuilder = new Index.Builder(document).index(index);
                 bulkBuilder.addAction(indexBuilder.build());
             }

@@ -90,7 +90,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
                 .build());
     }
 
-    public String getTopNQuery(int N, String groupByTerm, String keyForMissingTerm, List<Filter> filters) {
+    public String getTopNQuery(int N, String groupByTerm, String keyForMissingTerm, List<Filter> filters, boolean aggregated) {
         return render("top_n_terms.ftl", ImmutableMap.builder()
                 .put("filters", getFilterQueries(filters))
                 .put("N", N)
@@ -100,7 +100,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
     }
 
     public String getSeriesFromQuery(Collection<String> from, long step, long start, long end,
-                                     String groupByTerm, List<Filter> filters) {
+                                     String groupByTerm, List<Filter> filters, boolean aggregated) {
         return render("series_for_terms.ftl", ImmutableMap.builder()
                 .put("filters", getFilterQueries(filters))
                 .put("from", from)
@@ -112,7 +112,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
     }
 
     public String getSeriesFromMissingQuery(long step, long start, long end, String groupByTerm,
-                                            String keyForMissingTerm, List<Filter> filters) {
+                                            String keyForMissingTerm, List<Filter> filters, boolean aggregated) {
         return render("series_for_missing.ftl", ImmutableMap.builder()
                 .put("filters", getFilterQueries(filters))
                 .put("groupByTerm", groupByTerm)
@@ -125,7 +125,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
 
     public String getSeriesFromOthersQuery(Collection<String> from, long step, long start, long end,
                                            String groupByTerm, boolean excludeMissing,
-                                           List<Filter> filters) {
+                                           List<Filter> filters, boolean aggregated) {
         return render("series_for_others.ftl", ImmutableMap.builder()
                 .put("filters", getFilterQueries(filters))
                 .put("from", from)
@@ -137,7 +137,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
                 .build());
     }
 
-    public String getApplicationsQuery(String prefix, long limit, List<Filter> filters) {
+    public String getApplicationsQuery(String prefix, long limit, List<Filter> filters, boolean aggregated) {
         Objects.requireNonNull(prefix);
         Objects.requireNonNull(filters);
         return render("aggregate_by_fuzzed_field.ftl", ImmutableMap.builder()
@@ -148,7 +148,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
                 .build());
     }
 
-    public String getHostsQuery(String regex, long limit, List<Filter> filters) {
+    public String getHostsQuery(String regex, long limit, List<Filter> filters, boolean aggregated) {
         Objects.requireNonNull(filters);
 
         return render("aggregate_by_regex.ftl", ImmutableMap.builder()
@@ -159,7 +159,7 @@ public class SearchQueryProvider implements FilterVisitor<String> {
                 .build());
     }
 
-    public String getConversationsRegexQuery(String regex, long limit, List<Filter> filters) {
+    public String getConversationsRegexQuery(String regex, long limit, List<Filter> filters, boolean aggregated) {
         Objects.requireNonNull(filters);
 
         return render("aggregate_by_regex.ftl", ImmutableMap.builder()

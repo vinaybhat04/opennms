@@ -290,7 +290,7 @@ public class EventToIndex implements AutoCloseable {
 			}
 		}
 
-		String completeIndexName = indexStrategy.getIndex(indexSettings, INDEX_NAME, cal.toInstant());
+		String completeIndexName = indexStrategy.getIndex(indexSettings.getIndexPrefix(), INDEX_NAME, cal.toInstant());
 
 		if (LOG.isDebugEnabled()){
 			String str = "populateEventIndexBodyFromEvent - index:"

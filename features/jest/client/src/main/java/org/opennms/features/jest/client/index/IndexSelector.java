@@ -101,20 +101,22 @@ public class IndexSelector {
         Instant startDate = Instant.ofEpochMilli(start - expandTimeRangeInMs);
         Instant currentDate = startDate;
         long duration = end - start;
+        String indexPrefix = indexSettings.getIndexPrefix();
         if (duration > 0 && timeRangeAggregateThresholdMs > duration) {
-            indexSettings.setIndexPrefix(indexSettings.getAggregateIndexPrefix());
+            indexPrefix = indexSettings.getAggregateIndexPrefix();
         }
+        int indexPrefixLen = indexPrefix != null ? indexPrefix.length() + 1 : 0;
         while (currentDate.isBefore(endDate)) {
-            String index = strategy.getIndex(indexSettings, prefix, currentDate);
+            String index = strategy.getIndex(indexPrefix, prefix, currentDate);
             all.add(index);
             currentDate = plusOne(currentDate);
         }
 
         // collapse the indexes in order to reduce the length of the URL:
-        String elementAfterSequence = strategy.getIndex(indexSettings, prefix, currentDate);
-        String elementBeforeSequence = strategy.getIndex(indexSettings, prefix, minusOne(startDate));
+        String elementAfterSequence = strategy.getIndex(indexPrefix, prefix, currentDate);
+        String elementBeforeSequence = strategy.getIndex(indexPrefix, prefix, minusOne(startDate));
 
-        return collapseList(all, elementBeforeSequence, elementAfterSequence, 0);
+        return collapseList(all, elementBeforeSequence, elementAfterSequence, 0, indexPrefixLen);
     }
 
     private Instant minusOne(Instant date){
@@ -132,13 +134,12 @@ public class IndexSelector {
     private List<String> collapseList(final List<String> orgList,
                                       String elementBeforeSequence,
                                       String elementAfterSequence,
-                                      int offset) {
+                                      int offset, int indexPrefixLen) {
         if (orgList.size() < 2) {
             // nothing to do
             return orgList;
         }
-
-        int collapseAfter = prefix.length() + strategy.getPattern().length() - 1 + offset;
+        int collapseAfter =  indexPrefixLen + prefix.length() + strategy.getPattern().length() - 1 + offset;
         boolean beginningIsSameAsEnd = orgList.get(0).substring(0, collapseAfter)
                 .equals(orgList.get(orgList.size() - 1).substring(0, collapseAfter));
         boolean doCollapsingAtBeginning = !elementBeforeSequence.startsWith(orgList.get(0).substring(0, collapseAfter));
@@ -147,20 +148,20 @@ public class IndexSelector {
 
         return collapseList(orgList,
                 doCollapsingAtBeginning,
-                doCollapsingAtEnd, 0);
+                doCollapsingAtEnd, 0, indexPrefixLen);
     }
 
     private List<String> collapseList(final List<String> orgList,
                                       boolean doCollapsingAtBeginning,
                                       boolean doCollapsingAtEnd,
-                                      int offset) {
+                                      int offset, int indexPrefixLen) {
         if (orgList.size() < 2) {
             // nothing to do
             return orgList;
         }
 
         List<String> collapsedList = orgList;
-        int collapseAfter = prefix.length() + strategy.getPattern().length() - 1 + offset;
+        int collapseAfter = indexPrefixLen + prefix.length() + strategy.getPattern().length() - 1 + offset;
 
         collapsedList = StringCollapser
                 .forList(collapsedList).collapseAfterChars(collapseAfter)
@@ -169,11 +170,11 @@ public class IndexSelector {
                 .doCollapsingAtEnd(doCollapsingAtEnd)
                 .collapse();
 
-        if (collapseAfter > prefix.length() + IndexStrategy.YEARLY.getPattern().length()) {
+        if (collapseAfter > indexPrefixLen + prefix.length() + IndexStrategy.YEARLY.getPattern().length()) {
             collapsedList = collapseList(collapsedList,
                     false,
                     false,
-                    offset - 3);
+                    offset - 3, indexPrefixLen);
         }
 
         return collapsedList;

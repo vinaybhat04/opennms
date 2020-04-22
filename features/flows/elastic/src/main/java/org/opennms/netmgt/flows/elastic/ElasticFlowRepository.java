@@ -169,6 +169,8 @@ public class ElasticFlowRepository implements FlowRepository {
 
     private boolean enableFlowForwarding = false;
 
+    private final long timeRangeAggregateThresholdMs;
+
     /**
      * Cache for marking nodes and interfaces as having flows.
      *
@@ -193,6 +195,7 @@ public class ElasticFlowRepository implements FlowRepository {
         this.tracerRegistry = tracerRegistry;
         this.enrichedFlowForwarder = enrichedFlowForwarder;
         this.indexSettings = Objects.requireNonNull(indexSettings);
+        this.timeRangeAggregateThresholdMs = timeRangeAggregateThresholdMs;
         this.indexSelector = new IndexSelector(indexSettings, INDEX_NAME, indexStrategy, maxFlowDurationMs, timeRangeAggregateThresholdMs);
 
         flowsPersistedMeter = metricRegistry.meter("flowsPersisted");
@@ -261,7 +264,7 @@ public class ElasticFlowRepository implements FlowRepository {
             final BulkRequest<FlowDocument> bulkRequest = new BulkRequest<>(client, flowDocuments, (documents) -> {
                 final Bulk.Builder bulkBuilder = new Bulk.Builder();
                 for (FlowDocument flowDocument : documents) {
-                    final String index = indexStrategy.getIndex(indexSettings, INDEX_NAME, Instant.ofEpochMilli(flowDocument.getTimestamp()));
+                    final String index = indexStrategy.getIndex(indexSettings.getIndexPrefix(), INDEX_NAME, Instant.ofEpochMilli(flowDocument.getTimestamp()));
                     final Index.Builder indexBuilder = new Index.Builder(flowDocument)
                             .index(index);
                     bulkBuilder.addAction(indexBuilder.build());
@@ -347,8 +350,10 @@ public class ElasticFlowRepository implements FlowRepository {
 
     @Override
     public CompletableFuture<List<String>> getApplications(String matchingPrefix, long limit, List<Filter> filters) {
-        final String query = searchQueryProvider.getApplicationsQuery(matchingPrefix, limit, filters);
-        return searchAsync(query, extractTimeRangeFilter(filters)).thenApply(res -> processGroupedByResult(res, limit));
+        TimeRangeFilter timeRangeFilter = extractTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
+        final String query = searchQueryProvider.getApplicationsQuery(matchingPrefix, limit, filters, aggregatedFlowsQuery);
+        return searchAsync(query, timeRangeFilter).thenApply(res -> processGroupedByResult(res, limit));
     }
 
     @Override
@@ -400,8 +405,10 @@ public class ElasticFlowRepository implements FlowRepository {
                 lowerIPPattern,
                 upperIPPattern,
                 applicationPattern);
-        String query = searchQueryProvider.getConversationsRegexQuery(regex, limit, filters);
-        return searchAsync(query, extractTimeRangeFilter(filters)).thenApply(res -> processGroupedByResult(res, limit));
+        TimeRangeFilter timeRangeFilter = extractTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
+        String query = searchQueryProvider.getConversationsRegexQuery(regex, limit, filters, aggregatedFlowsQuery);
+        return searchAsync(query, timeRangeFilter).thenApply(res -> processGroupedByResult(res, limit));
     }
 
     @Override
@@ -476,8 +483,10 @@ public class ElasticFlowRepository implements FlowRepository {
 
     @Override
     public CompletableFuture<List<String>> getHosts(String regex, long limit, List<Filter> filters) {
-        final String hostsQuery = searchQueryProvider.getHostsQuery(regex, limit, filters);
-        return searchAsync(hostsQuery, extractTimeRangeFilter(filters)).thenApply(res -> processGroupedByResult(res,
+        TimeRangeFilter timeRangeFilter = extractTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
+        final String hostsQuery = searchQueryProvider.getHostsQuery(regex, limit, filters, aggregatedFlowsQuery);
+        return searchAsync(hostsQuery, timeRangeFilter).thenApply(res -> processGroupedByResult(res,
                 limit));
     }
 
@@ -556,7 +565,9 @@ public class ElasticFlowRepository implements FlowRepository {
         // Increase the multiplier for increased accuracy
         // See https://www.elastic.co/guide/en/elasticsearch/reference/current/search-aggregations-bucket-terms-aggregation.html#_size
         final int multiplier = 2;
-        final String query = searchQueryProvider.getTopNQuery(multiplier*N, groupByTerm, keyForMissingTerm, filters);
+        TimeRangeFilter timeRangeFilter = extractTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
+        final String query = searchQueryProvider.getTopNQuery(multiplier*N, groupByTerm, keyForMissingTerm, filters, aggregatedFlowsQuery);
         return searchAsync(query, extractTimeRangeFilter(filters))
                 .thenApply(res -> processGroupedByResult(res, N));
     }
@@ -573,9 +584,10 @@ public class ElasticFlowRepository implements FlowRepository {
         }
 
         final TimeRangeFilter timeRangeFilter = getRequiredTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
         final ImmutableTable.Builder<Directional<String>, Long, Double> builder = ImmutableTable.builder();
         final String seriesFromQuery = searchQueryProvider.getSeriesFromQuery(entities, step,
-                timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, filters);
+                timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, filters, aggregatedFlowsQuery);
         CompletableFuture<Void> seriesFuture;
 
         seriesFuture = searchAsync(seriesFromQuery, timeRangeFilter)
@@ -587,7 +599,7 @@ public class ElasticFlowRepository implements FlowRepository {
         if (includeOther) {
             // We also want to gather series for all other terms
             final String seriesFromOthersQuery = searchQueryProvider.getSeriesFromOthersQuery(entities, step,
-                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, false, filters);
+                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, false, filters, aggregatedFlowsQuery);
             seriesFuture = seriesFuture.thenCombine(searchAsync(seriesFromOthersQuery, timeRangeFilter),
                     (ignored, res) -> processOthersResult(res, builder));
         }
@@ -599,6 +611,7 @@ public class ElasticFlowRepository implements FlowRepository {
                                                                                           String keyForMissingTerm,
                                                                                           boolean includeOther, List<Filter> filters) {
         final TimeRangeFilter timeRangeFilter = getRequiredTimeRangeFilter(filters);
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
         final ImmutableTable.Builder<Directional<String>, Long, Double> builder = ImmutableTable.builder();
         CompletableFuture<Void> seriesFuture;
         if (topN.size() < 1) {
@@ -606,7 +619,7 @@ public class ElasticFlowRepository implements FlowRepository {
             seriesFuture = CompletableFuture.completedFuture(null);
         } else {
             final String seriesFromTopNQuery = searchQueryProvider.getSeriesFromQuery(topN, step, timeRangeFilter.getStart(),
-                    timeRangeFilter.getEnd(), groupByTerm, filters);
+                    timeRangeFilter.getEnd(), groupByTerm, filters, aggregatedFlowsQuery);
             seriesFuture = searchAsync(seriesFromTopNQuery, timeRangeFilter)
                     .thenApply(res -> {
                         toTable(builder, res);
@@ -618,7 +631,7 @@ public class ElasticFlowRepository implements FlowRepository {
         if (missingTermIncludedInTopN) {
             // We also need to query for items with a missing term, this will require a separate query
             final String seriesFromMissingQuery = searchQueryProvider.getSeriesFromMissingQuery(step,
-                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, keyForMissingTerm, filters);
+                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, keyForMissingTerm, filters, aggregatedFlowsQuery);
             seriesFuture = seriesFuture
                     .thenCombine(searchAsync(seriesFromMissingQuery, extractTimeRangeFilter(filters)), (ignored,res) -> {
                 toTable(builder, res);
@@ -629,7 +642,7 @@ public class ElasticFlowRepository implements FlowRepository {
         if (includeOther) {
             // We also want to gather series for terms not part of the Top N
             final String seriesFromOthersQuery = searchQueryProvider.getSeriesFromOthersQuery(topN, step,
-                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, missingTermIncludedInTopN, filters);
+                    timeRangeFilter.getStart(), timeRangeFilter.getEnd(), groupByTerm, missingTermIncludedInTopN, filters, aggregatedFlowsQuery);
             seriesFuture = seriesFuture.thenCombine(searchAsync(seriesFromOthersQuery, timeRangeFilter),
                     (ignored,res) -> processOthersResult(res, builder));
         }
@@ -677,13 +690,14 @@ public class ElasticFlowRepository implements FlowRepository {
         final long end = Math.max(timeRangeFilter.getStart(), timeRangeFilter.getEnd() - 1);
         // A single step
         final long step = timeRangeFilter.getEnd() - timeRangeFilter.getStart();
-
+        boolean aggregatedFlowsQuery = isAggregated(timeRangeFilter);
         CompletableFuture<Map<String, TrafficSummary<String>>> summariesFuture;
         if (from.size() < 1) {
             // If there are no entries, skip the query
             summariesFuture = CompletableFuture.completedFuture(new LinkedHashMap<>());
         } else {
-            final String bytesFromQuery = searchQueryProvider.getSeriesFromQuery(from, step, start, end, groupByTerm, filters);
+
+            final String bytesFromQuery = searchQueryProvider.getSeriesFromQuery(from, step, start, end, groupByTerm, filters, aggregatedFlowsQuery);
             summariesFuture = searchAsync(bytesFromQuery, timeRangeFilter).thenApply(ElasticFlowRepository::toTrafficSummaries);
         }
 
@@ -691,7 +705,7 @@ public class ElasticFlowRepository implements FlowRepository {
         if (missingTermIncluded) {
             // We also need to query for items with a missing term, this will require a separate query
             final String bytesFromMissingQuery = searchQueryProvider.getSeriesFromMissingQuery(step, start, end,
-                    groupByTerm, keyForMissingTerm, filters);
+                    groupByTerm, keyForMissingTerm, filters, aggregatedFlowsQuery);
             summariesFuture = summariesFuture.thenCombine(searchAsync(bytesFromMissingQuery, timeRangeFilter), (summaries,results) -> {
                 summaries.putAll(toTrafficSummaries(results));
                 return summaries;
@@ -701,7 +715,7 @@ public class ElasticFlowRepository implements FlowRepository {
         if (includeOther) {
             // We also want to tally up traffic from other elements not part of the Top N
             final String bytesFromOthersQuery = searchQueryProvider.getSeriesFromOthersQuery(from, step, start, end,
-                    groupByTerm, missingTermIncluded, filters);
+                    groupByTerm, missingTermIncluded, filters, aggregatedFlowsQuery);
             summariesFuture = summariesFuture.thenCombine(searchAsync(bytesFromOthersQuery, timeRangeFilter), (summaries,results) -> {
                 final MetricAggregation aggs = results.getAggregations();
                 if (aggs == null) {
@@ -944,6 +958,14 @@ public class ElasticFlowRepository implements FlowRepository {
             return tracerRegistry.getTracer();
         }
         return GlobalTracer.get();
+    }
+
+    private boolean isAggregated(TimeRangeFilter timeRangeFilter) {
+        long duration =  timeRangeFilter.getEnd() - timeRangeFilter.getStart();
+        if (duration > 0 && timeRangeAggregateThresholdMs > duration) {
+            return true;
+        }
+        return false;
     }
 
     private static <T, A, R> CompletableFuture<R> transpose(final Collection<CompletableFuture<T>> futures,

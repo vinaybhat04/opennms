@@ -33,8 +33,6 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.TimeZone;
 
-import org.opennms.features.jest.client.template.IndexSettings;
-
 import com.google.common.base.Strings;
 
 /**
@@ -62,10 +60,11 @@ public enum IndexStrategy {
                 .withZone(UTC);
     }
 
-    public String getIndex(IndexSettings indexSettings, String indexName, TemporalAccessor temporal) {
+    public String getIndex(String indexPrefix, String indexName, TemporalAccessor temporal) {
         final StringBuilder sb = new StringBuilder();
-        if (!Strings.isNullOrEmpty(indexSettings.getIndexPrefix())) {
-            sb.append(indexSettings.getIndexPrefix());
+        if (!Strings.isNullOrEmpty(indexPrefix)) {
+            sb.append(indexPrefix);
+            sb.append("-");
         }
         sb.append(indexName);
         sb.append("-");
