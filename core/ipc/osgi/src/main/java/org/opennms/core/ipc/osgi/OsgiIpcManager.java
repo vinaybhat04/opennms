@@ -151,6 +151,9 @@ public class OsgiIpcManager extends AbstractMessageConsumerManager implements Rp
     @Override
     public void destroy() throws Exception {
         sinkRegisterConsumerExecutor.shutdownNow();
+        if(getStartupExecutor() != null) {
+            getStartupExecutor().shutdown();
+        }
     }
 
     private class RpcClientDelegate<R extends RpcRequest, S extends RpcResponse> implements RpcClient {

@@ -524,6 +524,9 @@ public class OpennmsGrpcServer extends AbstractMessageConsumerManager implements
         }
         rpcTimeoutExecutor.shutdownNow();
         responseHandlerExecutor.shutdownNow();
+        if(getStartupExecutor() != null) {
+            getStartupExecutor().shutdown();
+        }
         LOG.info("OpenNMS gRPC server stopped");
     }
 
