@@ -151,7 +151,7 @@
 
         <simpleType>
           <restriction base="string">
-            <pattern value="(MD5|SHA)"/>
+            <pattern value="(MD5|SHA|SHA224|SHA256|SHA512)"/>
           </restriction>
         </simpleType>
       </attribute>
