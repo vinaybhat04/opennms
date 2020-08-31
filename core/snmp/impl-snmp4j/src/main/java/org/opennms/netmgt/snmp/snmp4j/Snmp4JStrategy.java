@@ -40,6 +40,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -49,6 +50,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
 import org.opennms.core.logging.Logging;
+import org.opennms.core.sysprops.SystemProperties;
 import org.opennms.core.utils.SystemInfoUtils;
 import org.opennms.netmgt.snmp.CollectionTracker;
 import org.opennms.netmgt.snmp.SnmpAgentConfig;
@@ -96,8 +98,6 @@ import org.snmp4j.smi.SMIConstants;
 import org.snmp4j.smi.UdpAddress;
 import org.snmp4j.smi.VariableBinding;
 import org.snmp4j.transport.DefaultUdpTransportMapping;
-
-import org.opennms.core.sysprops.SystemProperties;
 
 
 public class Snmp4JStrategy implements SnmpStrategy {
@@ -335,7 +335,7 @@ public class Snmp4JStrategy implements SnmpStrategy {
                     @Override
                     public void onResponse(final ResponseEvent responseEvent) {
                         try {
-                            future.complete(processResponse(agentConfig, responseEvent));
+                            future.complete(processResponse(agentConfig, responseEvent, pdu));
                         } catch (final Exception e) {
                             future.completeExceptionally(new SnmpException(e));
                         } finally {
@@ -405,7 +405,7 @@ public class Snmp4JStrategy implements SnmpStrategy {
     /**
      * TODO: Merge this logic with {@link Snmp4JWalker.Snmp4JResponseListener} #processResponse(PDU response)
      */
-    private static SnmpValue[] processResponse(Snmp4JAgentConfig agentConfig, ResponseEvent responseEvent) throws IOException {
+    private static SnmpValue[] processResponse(Snmp4JAgentConfig agentConfig, ResponseEvent responseEvent, PDU pdu) throws IOException {
         SnmpValue[] retvalues = { null };
 
         if (responseEvent.getResponse() == null) {
@@ -419,7 +419,7 @@ public class Snmp4JStrategy implements SnmpStrategy {
         } else if (responseEvent.getResponse().get(0).getSyntax() == SMIConstants.SYNTAX_NULL) {
             LOG.info("processResponse: Null value returned in varbind: {}. Agent: {}, requestID={}", responseEvent.getResponse().get(0), agentConfig, responseEvent.getRequest().getRequestID());
         } else {
-            retvalues = convertResponseToValues(responseEvent);
+            retvalues = convertResponseToValues(responseEvent, pdu);
 
             LOG.debug("processResponse: SNMP operation successful, value: {}", (Object)retvalues);
         }
@@ -427,9 +427,27 @@ public class Snmp4JStrategy implements SnmpStrategy {
         return retvalues;
     }
 
-    private static SnmpValue[] convertResponseToValues(ResponseEvent responseEvent) {
+    private static SnmpValue[] convertResponseToValues(ResponseEvent responseEvent, PDU pdu) {
         SnmpValue[] retvalues = new Snmp4JValue[responseEvent.getResponse().getVariableBindings().size()];
-        
+        if(pdu.size() != retvalues.length) {
+            LOG.warn("Unexpected results, request oids length doesn't match response values");
+            for (int i = 0; i < pdu.getVariableBindings().size(); i++) {
+                VariableBinding vb = pdu.getVariableBindings().get(i);
+                if (retvalues.length <= pdu.getVariableBindings().size() &&
+                        vb.getOid().equals(responseEvent.getRequest().get(i).getOid())) {
+                    retvalues[i] = new Snmp4JValue(responseEvent.getResponse().get(i).getVariable());
+                } else {
+                    Optional<? extends VariableBinding> matchingVb = responseEvent.getResponse().getVariableBindings().stream()
+                            .filter(responseVb -> responseVb.getOid().equals(vb.getOid())).findFirst();
+                    if (matchingVb.isPresent()) {
+                        retvalues[i] = new Snmp4JValue(matchingVb.get().getVariable());
+                    } else {
+                        retvalues[i] = new Snmp4JValue(SnmpValue.SNMP_NULL, null);
+                    }
+                }
+            }
+            return retvalues;
+        }
         for (int i = 0; i < retvalues.length; i++) {
             retvalues[i] = new Snmp4JValue(responseEvent.getResponse().get(i).getVariable());
         }
