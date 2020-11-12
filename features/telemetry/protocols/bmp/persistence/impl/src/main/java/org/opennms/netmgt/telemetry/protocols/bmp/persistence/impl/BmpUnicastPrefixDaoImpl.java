@@ -31,6 +31,7 @@ package org.opennms.netmgt.telemetry.protocols.bmp.persistence.impl;
 import java.util.Date;
 import java.util.List;
 
+import org.hibernate.transform.ResultTransformer;
 import org.opennms.core.criteria.Criteria;
 import org.opennms.core.criteria.CriteriaBuilder;
 import org.opennms.core.criteria.restrictions.EqRestriction;
@@ -38,6 +39,7 @@ import org.opennms.core.criteria.restrictions.Restrictions;
 import org.opennms.netmgt.dao.hibernate.AbstractDaoHibernate;
 import org.opennms.netmgt.telemetry.protocols.bmp.persistence.api.BmpUnicastPrefix;
 import org.opennms.netmgt.telemetry.protocols.bmp.persistence.api.BmpUnicastPrefixDao;
+import org.opennms.netmgt.telemetry.protocols.bmp.persistence.api.PeerStats;
 import org.opennms.netmgt.telemetry.protocols.bmp.persistence.api.PrefixByAS;
 
 import com.google.common.base.Strings;
@@ -75,11 +77,39 @@ public class BmpUnicastPrefixDaoImpl extends AbstractDaoHibernate<BmpUnicastPref
     public List<PrefixByAS> getPrefixesGroupedbyAS() {
         final StringBuilder sql = new StringBuilder();
         sql.append("SELECT DISTINCT new org.opennms.netmgt.telemetry.protocols.bmp.persistence.api.PrefixByAS( " +
-                "prefix.prefix, prefix.prefixLen, prefix.originAs, max(prefix.timestamp), count(prefix.hashId)) ");
+                "prefix.prefix, prefix.prefixLen, prefix.originAs, max(prefix.timestamp), count(prefix.bmpPeers)) ");
         sql.append("FROM BmpUnicastPrefix AS prefix ");
         sql.append("WHERE prefix.originAs != 0 AND prefix.originAs !=23456 AND prefix.isWithDrawn = false ");
         sql.append("GROUP BY prefix.prefix,  prefix.prefixLen, prefix.originAs");
 
         return findObjects(PrefixByAS.class, sql.toString());
+    }
+
+    @Override
+    public List<PeerStats> getStatsByPeer(int int_window) {
+        return getHibernateTemplate().execute(session -> (List<PeerStats>) session.createSQLQuery(
+                "SELECT   to_timestamp((extract(epoch from timestamp)::bigint / 60)::bigint * 60) at time zone 'utc' as IntervalTime," +
+                        "   peer_hash_id," +
+                        "  count(case WHEN ip_rib_log.iswithdrawn = true THEN 1 ELSE null END) as withdraws " +
+                        "  count(case WHEN ip_rib_log.iswithdrawn = false THEN 1 ELSE null END) as updates " +
+                        "FROM " +
+                        "  bmp_ip_ribs iprib" +
+                        "WHERE " +
+                        "  timestamp >= to_timestamp((extract(epoch from now())::bigint / 60)::bigint * 60) at time zone 'utc' - int_window " +
+                        "  AND timestamp < to_timestamp((extract(epoch from now())::bigint / 60)::bigint * 60) at time zone 'utc'" +
+                        "GROUP BY " +
+                        "  IntervalTime, peer_hash_id ")
+                .setResultTransformer(new ResultTransformer() {
+                    @Override
+                    public Object transformTuple(Object[] tuple, String[] aliases) {
+                        return new PeerStats((Long) tuple[0], (String) tuple[1],  (Integer) tuple[2], (Integer) tuple[2]);
+                    }
+
+                    @SuppressWarnings("rawtypes")
+                    @Override
+                    public List transformList(List collection) {
+                        return collection;
+                    }
+                }).list());
     }
 }

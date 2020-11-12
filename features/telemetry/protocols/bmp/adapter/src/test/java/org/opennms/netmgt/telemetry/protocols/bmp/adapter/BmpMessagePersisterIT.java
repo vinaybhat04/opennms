@@ -26,7 +26,11 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp;
+package org.opennms.netmgt.telemetry.protocols.bmp.adapter;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -39,6 +43,7 @@ import org.junit.runner.RunWith;
 import org.opennms.core.test.OpenNMSJUnit4ClassRunner;
 import org.opennms.core.test.db.annotations.JUnitTemporaryDatabase;
 import org.opennms.core.utils.InetAddressUtils;
+import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.BmpMessageHandler;
 import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.proto.Message;
 import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.proto.Type;
 import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.proto.records.BaseAttribute;
@@ -117,9 +122,9 @@ public class BmpMessagePersisterIT {
         msg = new Message("91e3a7ff9f5676ed6ae6fcd8a6b455ec", Type.ROUTER, ImmutableList.of(router1, router2));
         bmpMessageHandler.handle(msg);
         List<BmpRouter> routers = bmpRouterDao.findAll();
-        Assert.assertEquals(2, routers.size());
+        assertEquals(2, routers.size());
         BmpRouter bmpRouter = routers.get(0);
-        Assert.assertEquals(bmpRouter.getBmpCollector().getHashId(), "91e3a7ff9f5676ed6ae6fcd8a6b455ec");
+        assertEquals(bmpRouter.getBmpCollector().getHashId(), "91e3a7ff9f5676ed6ae6fcd8a6b455ec");
 
         // Change collector state to stop and persist collector again. Routers should be down when collector is stopped.
         collector.action = Collector.Action.STOPPED;
@@ -176,6 +181,53 @@ public class BmpMessagePersisterIT {
         bmpMessageHandler.handle(msg);
         List<BmpBaseAttribute> bmpBaseAttributes = bmpBaseAttributeDao.findAll();
         Assert.assertFalse(bmpBaseAttributes.isEmpty());
+
+    }
+
+    @Test
+    public void testStats() {
+        // Mock unicast prefix element
+        BmpUnicastPrefix bmpUnicastPrefix = new BmpUnicastPrefix();
+        BmpPeer bmpPeer = new BmpPeer();
+        final String peerHashId = "61e5a7ff9f5433ed6ae6fcd9a2b432gf";
+        final String baseAttrHashId = "23212a7ff9f5433ed6ae6fcd9a2b432gf";
+        final Long originAs = 4567L;
+        final String prefix = "10.11.12.110";
+        bmpPeer.setHashId(peerHashId);
+        bmpUnicastPrefix.setBmpPeer(bmpPeer);
+        bmpUnicastPrefix.setBaseAttrHashId(baseAttrHashId);
+        bmpUnicastPrefix.setOriginAs(4567L);
+        bmpUnicastPrefix.setPrefix(prefix);
+        bmpUnicastPrefix.setPrefixLen(4);
+        bmpUnicastPrefix.setWithDrawn(false);
+        BmpMessagePersister bmpMessagePersister = new BmpMessagePersister();
+        bmpMessagePersister.updateStats(bmpUnicastPrefix);
+        // Updates should get updated but withdraws should be null
+        assertTrue(bmpMessagePersister.getUpdatesByPeer().get(peerHashId) == 1L);
+        assertTrue(bmpMessagePersister.getUpdatesByAsn()
+                .get(new BmpMessagePersister.AsnKey(peerHashId, originAs)) == 1L);
+        assertTrue(bmpMessagePersister.getUpdatesByPrefix()
+                .get(new BmpMessagePersister.PrefixKey(peerHashId, prefix, 4)) == 1L);
+        // Withdraws should be null
+        assertNull(bmpMessagePersister.getWithdrawsByPeer().get(peerHashId));
+        assertNull(bmpMessagePersister.getWithdrawsByAsn()
+                .get(new BmpMessagePersister.AsnKey(peerHashId, originAs)));
+        assertNull(bmpMessagePersister.getWithdrawsByPrefix()
+                .get(new BmpMessagePersister.PrefixKey(peerHashId, prefix, 4)));
+
+        // Update with different base attributes.
+        bmpUnicastPrefix.setBaseAttrHashId("41e5a7ff9f5422ed6ae6fcd9a2b432gf");
+        bmpUnicastPrefix.setPrevBaseAttrHashId(baseAttrHashId);
+        bmpUnicastPrefix.setId(1L);
+        bmpMessagePersister.updateStats(bmpUnicastPrefix);
+        assertTrue(bmpMessagePersister.getUpdatesByAsn()
+                .get(new BmpMessagePersister.AsnKey(peerHashId, originAs)) == 2L);
+
+        // Send withdrawn
+        bmpUnicastPrefix.setWithDrawn(true);
+        bmpMessagePersister.updateStats(bmpUnicastPrefix);
+        assertTrue(bmpMessagePersister.getWithdrawsByAsn()
+                .get(new BmpMessagePersister.AsnKey(peerHashId, originAs)) == 1L);
 
     }
 

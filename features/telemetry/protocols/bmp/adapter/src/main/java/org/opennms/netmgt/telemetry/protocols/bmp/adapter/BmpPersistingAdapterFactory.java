@@ -28,6 +28,9 @@
 
 package org.opennms.netmgt.telemetry.protocols.bmp.adapter;
 
+import org.opennms.netmgt.collection.api.CollectionAgentFactory;
+import org.opennms.netmgt.collection.api.PersisterFactory;
+import org.opennms.netmgt.filter.api.FilterDao;
 import org.opennms.netmgt.telemetry.api.adapter.Adapter;
 import org.opennms.netmgt.telemetry.config.api.AdapterDefinition;
 import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.BmpMessageHandler;
@@ -41,6 +44,13 @@ public class BmpPersistingAdapterFactory extends AbstractAdapterFactory {
     private static final Logger LOG = LoggerFactory.getLogger(BmpPersistingAdapterFactory.class);
 
     private final BmpMessageHandler bmpMessageHandler;
+
+    private CollectionAgentFactory collectionAgentFactory;
+
+    private PersisterFactory persisterFactory;
+
+    private FilterDao filterDao;
+
 
     public BmpPersistingAdapterFactory(BmpMessageHandler bmpMessageHandler) {
         super(null);
@@ -60,9 +70,32 @@ public class BmpPersistingAdapterFactory extends AbstractAdapterFactory {
     @Override
     public Adapter createBean(AdapterDefinition adapterConfig) {
 
-        return new BmpPersistingAdapter(adapterConfig,
+        BmpPersistingAdapter bmpPersistingAdapter = new BmpPersistingAdapter(adapterConfig,
                 this.getTelemetryRegistry().getMetricRegistry(),
                 bmpMessageHandler);
+        bmpPersistingAdapter.setCollectionAgentFactory(this.getCollectionAgentFactory());
+        bmpPersistingAdapter.setInterfaceToNodeCache(this.getInterfaceToNodeCache());
+        bmpPersistingAdapter.setFilterDao(this.filterDao);
+        return bmpPersistingAdapter;
     }
 
+    public CollectionAgentFactory getCollectionAgentFactory() {
+        return collectionAgentFactory;
+    }
+
+    public void setCollectionAgentFactory(CollectionAgentFactory collectionAgentFactory) {
+        this.collectionAgentFactory = collectionAgentFactory;
+    }
+
+    public PersisterFactory getPersisterFactory() {
+        return persisterFactory;
+    }
+
+    public void setPersisterFactory(PersisterFactory persisterFactory) {
+        this.persisterFactory = persisterFactory;
+    }
+
+    public void setFilterDao(FilterDao filterDao) {
+        this.filterDao = filterDao;
+    }
 }

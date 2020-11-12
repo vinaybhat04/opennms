@@ -26,20 +26,22 @@
  *     http://www.opennms.com/
  *******************************************************************************/
 
-package org.opennms.netmgt.telemetry.protocols.bmp.adapter;
+package org.opennms.netmgt.telemetry.protocols.bmp.persistence.api;
 
-import org.opennms.netmgt.telemetry.config.api.AdapterDefinition;
-import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.BmpIntegrationAdapter;
-import org.opennms.netmgt.telemetry.protocols.bmp.adapter.openbmp.BmpMessageHandler;
+import java.io.Serializable;
 
-import com.codahale.metrics.MetricRegistry;
+public class PeerStats implements Serializable {
+    private static final long serialVersionUID = -335331584169717071L;
 
-public class BmpPersistingAdapter extends BmpIntegrationAdapter {
+    private final Long intervalTime;
+    private final String peerHashId;
+    private final Integer withdraws;
+    private final Integer updates;
 
-    public BmpPersistingAdapter(AdapterDefinition adapterConfig, MetricRegistry metricRegistry, BmpMessageHandler messageHandler) {
-        super(adapterConfig, metricRegistry, messageHandler);
-        BmpMessagePersister bmpMessagePersister = (BmpMessagePersister) messageHandler;
-        bmpMessagePersister.setAdapterConfig(adapterConfig);
+    public PeerStats(Long intervalTime, String peerHashId, Integer withdraws, Integer updates) {
+        this.intervalTime = intervalTime;
+        this.peerHashId = peerHashId;
+        this.withdraws = withdraws;
+        this.updates = updates;
     }
-
 }

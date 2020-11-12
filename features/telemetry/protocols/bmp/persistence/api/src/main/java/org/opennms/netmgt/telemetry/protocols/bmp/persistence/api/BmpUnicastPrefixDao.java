@@ -41,4 +41,7 @@ public interface BmpUnicastPrefixDao extends OnmsDao<BmpUnicastPrefix, Long> {
     List<BmpUnicastPrefix> getUnicastPrefixesAfterDate(String hashId, Date time);
 
     List<PrefixByAS> getPrefixesGroupedbyAS();
+
+    List<PeerStats> getStatsByPeer(int int_window);
+
 }

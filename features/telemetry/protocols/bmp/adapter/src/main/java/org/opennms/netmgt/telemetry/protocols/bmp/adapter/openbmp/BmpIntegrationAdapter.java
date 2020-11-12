@@ -403,7 +403,7 @@ public class BmpIntegrationAdapter extends AbstractAdapter {
         final Stat stat = new Stat();
         stat.action = Stat.Action.ADD;
         stat.sequence = sequence.getAndIncrement();
-        stat.routerHash = Record.hash(context.sourceAddress.getHostAddress(), Integer.toString(context.sourcePort), context.collectorHashId);
+        stat.routerHash = Record.hash(context.sourceAddress.getHostAddress(), context.collectorHashId);
         stat.routerIp = context.sourceAddress;
         stat.peerHash = Record.hash(peer.getAddress(), peer.getDistinguisher(), stat.routerHash);
         stat.peerIp = address(peer.getAddress());
@@ -683,7 +683,7 @@ public class BmpIntegrationAdapter extends AbstractAdapter {
         }
 
         final String collectorHashId = Record.hash(messageLog.getSystemId());
-        final String routerHashId = Record.hash(messageLog.getSourceAddress(), Integer.toString(messageLog.getSourcePort()), collectorHashId);
+        final String routerHashId = Record.hash(messageLog.getSourceAddress(), collectorHashId);
         final Context context = new Context(messageLog.getSystemId(),
                                             collectorHashId,
                                             routerHashId,
@@ -750,7 +750,7 @@ public class BmpIntegrationAdapter extends AbstractAdapter {
         }
 
         public String getRouterHash() {
-            return Record.hash(sourceAddress.getHostAddress(), Integer.toString(sourcePort), collectorHashId);
+            return Record.hash(sourceAddress.getHostAddress(), collectorHashId);
         }
     }
 
